@@ -1,69 +1,48 @@
 <?php
 
-namespace App\Controller;
+namespace App\Http\Controllers;
 
-use App\Model\Guest;
-use Respect\Validation\Validator as v;
+use Illuminate\Http\Request;
+use App\Models\Guest;
 
-class GuestController
+class GuestController extends Controller
 {
-    // получить всех гостей
-    public function getAll($request, $response, $args)
+    // создание гостя
+    public function store(Request $request)
     {
-        $guests = Guest::all();
-        return $response->withJson($guests);
-    }
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'surname' => 'required|string|max:255',
+            'email' => 'nullable|email|unique:guests,email',
+            'phone' => 'required|string|unique:guests,phone',
+        ]);
 
-    // создать гостя
-    public function create($request, $response, $args)
-    {
-        $data = $request->getParsedBody();
+        $data = $request->all();
 
-        // валидация
-        v::email()->assert($data['email']);
-        v::phone()->assert($data['phone']);
-        
-        $guest = new Guest();
-        $guest->first_name = $data['first_name'];
-        $guest->last_name = $data['last_name'];
-        $guest->email = $data['email'];
-        $guest->phone = $data['phone'];
-        $guest->country = $data['country'] ?? $this->getCountryFromPhone($data['phone']);
-        $guest->save();
-
-        return $response->withJson($guest, 201);
-    }
-
-    // получить гостя по id
-    public function get($request, $response, $args)
-    {
-        $guest = Guest::find($args['id']);
-        return $response->withJson($guest);
-    }
-
-    // обновить гостя
-    public function update($request, $response, $args)
-    {
-        $data = $request->getParsedBody();
-        $guest = Guest::find($args['id']);
-        $guest->update($data);
-        return $response->withJson($guest);
-    }
-
-    // удалить гостя
-    public function delete($request, $response, $args)
-    {
-        $guest = Guest::find($args['id']);
-        $guest->delete();
-        return $response->withStatus(204);
-    }
-
-    // страна по номеру телефона
-    private function getCountryFromPhone($phone)
-    {
-        if (substr($phone, 0, 2) === '+7') {
-            return 'Russia';
+        // определение страны
+        if (empty($data['country'])) {
+            $data['country'] = $this->getCountryByPhone($data['phone']);
         }
-        return null; // можно добавить для других стран
+
+        $guest = Guest::create($data);
+
+        return response()->json($guest, 201);
+    }
+
+    // метод для определения страны по префиксу
+    private function getCountryByPhone($phone)
+    {
+        $phoneCodeToCountry = [
+            '+7' => 'Россия',
+            '+1' => 'США',
+        ];
+
+        foreach ($phoneCodeToCountry as $code => $country) {
+            if (str_starts_with($phone, $code)) {
+                return $country;
+            }
+        }
+
+        return 'Неизвестная страна';
     }
 }

@@ -1,26 +1,25 @@
 <?php
 
-namespace App\Middleware;
+namespace App\Http\Middleware;
 
-use Psr\Http\Message\ResponseInterface as Response;
-use Psr\Http\Message\ServerRequestInterface as Request;
+use Closure;
+use Illuminate\Http\Request;
 
-class DebugMiddleware
+class DebugHeaders
 {
-    public function __invoke(Request $request, Response $response, $next)
+    public function handle(Request $request, Closure $next)
     {
-        $startTime = microtime(true);
-        $startMemory = memory_get_usage();
+        $start = microtime(true);
 
-        $response = $next($request, $response);
+        $response = $next($request);
 
-        $endTime = microtime(true);
-        $endMemory = memory_get_usage();
+        // подсчёт времени выполнения и памяти
+        $executionTime = (microtime(true) - $start) * 1000; // в миллисекундах
+        $memoryUsage = memory_get_peak_usage(true) / 1024; // в КБ
 
-        // добавляем заголовки для времени и памяти
-        $response = $response
-            ->withHeader('X-Debug-Time', (int)(($endTime - $startTime) * 1000))
-            ->withHeader('X-Debug-Memory', (int)(($endMemory - $startMemory) / 1024));
+        // добавление заголовков
+        $response->headers->set('X-Debug-Time', number_format($executionTime, 2) . ' ms');
+        $response->headers->set('X-Debug-Memory', number_format($memoryUsage, 2) . ' KB');
 
         return $response;
     }
